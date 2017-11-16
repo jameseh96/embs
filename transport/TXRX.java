@@ -29,10 +29,9 @@ public class TXRX {
 		Logger.appendInt(shortAddr);
 		Logger.flush(Mote.INFO);
 
-		// Set the PAN ID to panId and the short address to 0xEE
 		radio.setPanId(panId, true);
 		radio.setShortAddr(shortAddr);
-		// Prepare beacon frame with source addressing
+
 		packet = new byte[127];
 
 		// Put radio into receive mode for a long time on channel 1
@@ -48,17 +47,6 @@ public class TXRX {
 			}
 		});
 		radio.startRx(Device.ASAP, 0, Time.currentTicks() + 0x7FFFFFFF);
-
-//		tsend = new Timer();
-//		tsend.setCallback(new TimerEvent(null) {
-//			public void invoke(byte param, long time) {
-//				TXRX.testPing(param, time);
-//			}
-//		});
-//		// Convert the periodic delay from ms to platform ticks
-//		xmitDelay = Time.toTickSpan(Time.MILLISECS, 2000);
-//		// Start the timer
-//		tsend.setAlarmBySpan(xmitDelay);
 	}
 
 	public static int getShortAddr() {
@@ -68,7 +56,7 @@ public class TXRX {
 	public static int getPanId() {
 		return panId;
 	}
-	
+
 	public static void addOnReceiveCallback(OnReceiveCallback cb) {
 		onReceiveCallbacks[callbackCount++] = cb;
 	}
@@ -86,19 +74,18 @@ public class TXRX {
 		radio.transmit(Device.ASAP | Radio.TXMODE_CCA, packet, 0, length, 0);
 	}
 
-	// On a received frame toggle LED
 	private static int onReceive(int flags, byte[] data, int len, int info, long time) {
 		if (data == null) { // marks end of reception period
 			// re-enable reception for a very long time
 			radio.startRx(Device.ASAP, 0, Time.currentTicks() + 0x7FFFFFFF);
 			return 0;
 		}
-		
 		DataFrame frame = parseDataFrame(data, len);
-		
+
 		for (int i = 0; i < callbackCount; i++) {
 			onReceiveCallbacks[i].invoke(frame);
 		}
+
 		return 0;
 	}
 
@@ -138,15 +125,6 @@ public class TXRX {
 		Util.copyData(payload, 0, packet, index, payload.length);
 		return index + payload.length;
 	}
-
-//	public static void testPing(byte param, long time) {
-//		DataFrame frame = new DataFrame();
-//		frame.setPanId(panId);
-//		frame.setDestAddr(Radio.SADDR_BROADCAST);
-//		frame.setPayload(new byte[] { 0x01, 0x02, 0x03 });
-//		sendDataFrame(frame);
-//		tsend.setAlarmBySpan(xmitDelay);
-//	}
 
 	// delegate to handle assembly delete, releases the radio
 	private static int onDelete(int type, int info) {
