@@ -34,4 +34,16 @@ public class DataFrame extends Frame {
 		Util.copyData(packet, index, payload, 0, len - index);
 		setPayload(payload);
 	}
+	
+	public DataFrame(DataFrame other) {
+		this();
+		setPanId(other.getPanId());
+		if (other.isDestAddr()) {
+			setDestAddr(other.getDestAddr());
+		}
+		if (other.isSrcAddr()) {
+			setSrcAddr(other.getSrcAddr());
+		}
+		setPayload(other.getPayload());
+	}
 }

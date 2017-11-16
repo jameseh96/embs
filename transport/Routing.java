@@ -71,9 +71,34 @@ public class Routing {
 		case ROUTING:
 			mergeNeighbourRoutingTable(df);
 			break;
+		case ROUTABLE_MESSAGE:
+			routeMessage(df);
 		default:
 			return;
 		}
+	}
+	
+	private static void routeMessage(DataFrame df) {
+		byte[] payload = df.getPayload();
+		int dest = Util.get16le(payload, 1);
+		if (dest == shortAddr) {
+			onMessage(df);
+		} else {
+			for (int i = 0; i < knownRoutes; i++) {
+				Route route = routingTable[i];
+				if (route.addr == dest) {
+					DataFrame df2 = new DataFrame(df);
+					df2.setDestAddr(route.peerAddr);
+					TXRX.sendDataFrame(df2);
+					break;
+				}
+			}
+		}
+	}
+	
+	private static void onMessage(DataFrame df) {
+		Logger.appendString(csr.s2b("Message Rec"));
+		Logger.flush(Mote.INFO);
 	}
 
 	private static void onPing(int addr) {
