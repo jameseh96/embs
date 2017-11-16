@@ -10,7 +10,7 @@ public class TXRX {
 	static Radio radio = new Radio();
 	static byte[] EUI = new byte[8];
 	static int shortAddr;
-	static int panId = 0xAA;
+	static int panId = 0x01;
 	
 	static OnReceiveCallback[] onReceiveCallbacks = new OnReceiveCallback[10];
 	static int callbackCount = 0;
@@ -36,7 +36,7 @@ public class TXRX {
 		packet = new byte[127];
 
 		// Put radio into receive mode for a long time on channel 1
-		radio.setChannel((byte) 3);
+		radio.setChannel((byte) 1);
 		radio.setRxHandler(new DevCallback(null) {
 			public int invoke(int flags, byte[] data, int len, int info, long time) {
 				return TXRX.onReceive(flags, data, len, info, time);
