@@ -17,7 +17,9 @@ public class Routing {
 	public static final byte ROUTABLE_MESSAGE = 0x04;
 	
 	private static Timer pingTimer;
+	private static Timer testTimer;
 	private static long pingTimerDelay;
+	private static long testTimerDelay;
 	static int shortAddr;
 	static int panId;
 	
@@ -27,15 +29,26 @@ public class Routing {
 	static {
 		shortAddr = TXRX.getShortAddr();
 		panId = TXRX.getPanId();
+
 		pingTimer = new Timer();
 		pingTimer.setCallback(new TimerEvent(null) {
 			public void invoke(byte param, long time) {
 				Routing.ping(param, time);
 			}
 		});
-
+		
 		pingTimerDelay = Time.toTickSpan(Time.MILLISECS, 2000);
 		pingTimer.setAlarmBySpan(pingTimerDelay);
+
+		testTimer = new Timer();
+		testTimer.setCallback(new TimerEvent(null) {
+			public void invoke(byte param, long time) {
+				Routing.testMessage(param, time);
+			}
+		});
+
+		testTimerDelay = Time.toTickSpan(Time.MILLISECS, 2000);
+		testTimer.setAlarmBySpan(testTimerDelay);
 
 		TXRX.addOnReceiveCallback(new TXRX.OnReceiveCallback() {
 			@Override
@@ -53,6 +66,19 @@ public class Routing {
 		df.setPayload(new byte[] {PING});
 		TXRX.sendDataFrame(df);
 //		pingTimer.setAlarmBySpan(pingTimerDelay);
+	}
+	
+	public static void testMessage(byte param, long time) {
+		if (shortAddr == 0x4702) {
+			Logger.appendString(csr.s2b("Message Send"));
+			Logger.flush(Mote.INFO);
+			DataFrame df = new DataFrame();
+			byte[] payload = new byte[10];
+			payload[0] = ROUTABLE_MESSAGE;
+			Util.set16le(payload, 1, 0x5400);
+			df.setPayload(payload);
+			routeMessage(df);
+		}
 	}
 
 	private static void onReceiveFrame(DataFrame df) {
@@ -81,6 +107,8 @@ public class Routing {
 	private static void routeMessage(DataFrame df) {
 		byte[] payload = df.getPayload();
 		int dest = Util.get16le(payload, 1);
+		Logger.appendHexInt(dest);
+		Logger.flush(Mote.INFO);
 		if (dest == shortAddr) {
 			onMessage(df);
 		} else {
@@ -88,7 +116,13 @@ public class Routing {
 				Route route = routingTable[i];
 				if (route.addr == dest) {
 					DataFrame df2 = new DataFrame(df);
-					df2.setDestAddr(route.peerAddr);
+					df2.setPanId(0x01);
+					df2.setSrcAddr(shortAddr);
+					df2.setDestAddr(route.peerAddr == 0xFFFF ? dest : route.peerAddr);
+					Logger.appendHexInt(df2.getPanId());
+					Logger.appendHexInt(df2.getSrcAddr());
+					Logger.appendHexInt(df2.getDestAddr());
+					Logger.flush(Mote.INFO);
 					TXRX.sendDataFrame(df2);
 					break;
 				}
