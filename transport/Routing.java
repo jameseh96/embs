@@ -1,6 +1,7 @@
 package transport;
 
 import com.ibm.saguaro.logger.Logger;
+import com.ibm.saguaro.system.LED;
 import com.ibm.saguaro.system.Mote;
 import com.ibm.saguaro.system.Radio;
 import com.ibm.saguaro.system.Time;
@@ -18,13 +19,18 @@ public class Routing {
 	
 	private static Timer pingTimer;
 	private static Timer testTimer;
+	private static Timer flashTimer;
 	private static long pingTimerDelay;
 	private static long testTimerDelay;
+	private static long flashTimerDelay;
 	static int shortAddr;
 	static int panId;
 	
 	private static Route[] routingTable = new Route[20];
 	private static int knownRoutes = 0;
+	
+	private static byte[] flashPattern = new byte[5];
+	private static int flashIndex = 0;
 
 	static {
 		shortAddr = TXRX.getShortAddr();
@@ -43,11 +49,11 @@ public class Routing {
 		testTimer = new Timer();
 		testTimer.setCallback(new TimerEvent(null) {
 			public void invoke(byte param, long time) {
-				Routing.testMessage(param, time);
+				Routing.transmit(param, time);
 			}
 		});
 
-		testTimerDelay = Time.toTickSpan(Time.MILLISECS, 2000);
+		testTimerDelay = Time.toTickSpan(Time.MILLISECS, 4000);
 		testTimer.setAlarmBySpan(testTimerDelay);
 
 		TXRX.addOnReceiveCallback(new TXRX.OnReceiveCallback() {
@@ -56,6 +62,32 @@ public class Routing {
 				Routing.onReceiveFrame(df);
 			}
 		});
+		
+		flashTimer = new Timer();
+		flashTimer.setCallback(new TimerEvent(null) {
+			public void invoke(byte param, long time) {
+				Routing.flashLEDS(param, time);
+			}
+		});
+
+		flashTimerDelay = Time.toTickSpan(Time.MILLISECS, 1000);
+
+		TXRX.addOnReceiveCallback(new TXRX.OnReceiveCallback() {
+			@Override
+			public void invoke(DataFrame df) {
+				Routing.onReceiveFrame(df);
+			}
+		});
+	}
+	
+	public static void flashLEDS(byte param, long time) {
+		for (int i = 0; i < 3; i++) {
+			LED.setState((byte) i, (byte)0);
+		}
+		LED.setState((byte) flashIndex++, (byte)1);
+		if (flashIndex < 5) {
+			flashTimer.setAlarmBySpan(flashTimerDelay);
+		}
 	}
 
 	public static void ping(byte param, long time) {
@@ -68,17 +100,23 @@ public class Routing {
 //		pingTimer.setAlarmBySpan(pingTimerDelay);
 	}
 	
-	public static void testMessage(byte param, long time) {
-		if (shortAddr == 0x4702) {
-			Logger.appendString(csr.s2b("Message Send"));
-			Logger.flush(Mote.INFO);
-			DataFrame df = new DataFrame();
-			byte[] payload = new byte[10];
-			payload[0] = ROUTABLE_MESSAGE;
-			Util.set16le(payload, 1, 0x5400);
-			df.setPayload(payload);
-			routeMessage(df);
-		}
+	public static void transmit(byte param, long time) {
+		DataFrame data = new DataFrame();
+		data.setSrcAddr(shortAddr);
+		data.setDestAddr(0x00);
+		byte[] payload = new byte[8];
+		payload[0] = ROUTABLE_MESSAGE;
+		Util.set16le(payload, 1, 0x5400);
+		payload[3] = 1;
+		payload[4] = 2;
+		payload[5] = 0;
+		payload[6] = 2;
+		payload[7] = 1;
+		data.setPayload(payload);
+		
+		Routing.routeMessage(data);
+		Logger.appendString(csr.s2b("Transmitting"));
+		Logger.flush(Mote.INFO);
 	}
 
 	private static void onReceiveFrame(DataFrame df) {
@@ -131,8 +169,13 @@ public class Routing {
 	}
 	
 	private static void onMessage(DataFrame df) {
-		Logger.appendString(csr.s2b("Message Rec"));
-		Logger.flush(Mote.INFO);
+		byte[] payload = df.getPayload();
+		
+		for (int i = 1; i < 6; i++) {
+			flashPattern[i-1] = payload[i];
+		}
+		
+		flashTimer.setAlarmBySpan(flashTimerDelay);
 	}
 
 	private static void onPing(int addr) {

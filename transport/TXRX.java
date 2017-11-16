@@ -93,7 +93,6 @@ public class TXRX {
 			radio.startRx(Device.ASAP, 0, Time.currentTicks() + 0x7FFFFFFF);
 			return 0;
 		}
-		LED.setState((byte) 1, (byte) (~LED.getState((byte) 1) & 1));
 		
 		DataFrame frame = parseDataFrame(data, len);
 		
